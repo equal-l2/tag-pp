@@ -10,3 +10,5 @@ edition = "2018"
 regex = "*"
 serde = "*"
 serde_json = "*"
+tag-geotag = {path = "../tag-geotag"}
+chrono = "*"
