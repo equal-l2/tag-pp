@@ -140,7 +140,9 @@ fn sc_geotag_pp(tag_pp: String, geotag: String, to: String) {
 
             let time = {
                 let s = i.next().unwrap().unwrap().as_str();
-                chrono::NaiveDateTime::parse_from_str(&s[1..s.len()-1], "%Y-%m-%d %H:%M:%S").unwrap().timestamp() as i32
+                chrono::NaiveDateTime::parse_from_str(&s[1..s.len() - 1], "%Y-%m-%d %H:%M:%S")
+                    .unwrap()
+                    .timestamp() as i32
             };
             let latitude: f64 = i.next().unwrap().unwrap().as_str().parse().unwrap();
             let longitude: f64 = i.next().unwrap().unwrap().as_str().parse().unwrap();
