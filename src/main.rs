@@ -49,6 +49,7 @@ fn sc_tag_pp(tag: String, to: String) {
 
     let f = std::fs::OpenOptions::new()
         .write(true)
+        .truncate(true)
         .create(true)
         .open(to)
         .unwrap();
@@ -88,18 +89,22 @@ fn sc_tag_pp(tag: String, to: String) {
 ///
 /// Each lines of resulting csv is defined as below:
 ///
-/// <line> ::= <id>,<time>,<latitude>,<longitude>,<server-num>,<url-part>
+/// <line> ::= <id>,<time>,<latitude>,<longitude>,<domain-num>,<url-num1>,<url-num2>
+///
+/// In data we use, <url-num1> is 1-4 digits, <url-num2> is 8-10 digits, and <url-num3> is exactly
+/// 10 digits.
 ///
 /// The original URL is in the form as below:
-/// <url> ::= http://farm<server-num>.static.flickr.com/<url-part>.jpg
+/// <url> ::= http://farm<domain-num>.static.flickr.com/<url-num1>/<id>_<url-num2>.jpg
 ///
-/// We remove common parts and extract the distinct parts.
-/// By the transformation, we can reduce data length by around 30%.
+/// We do not use a String as long as possible since it is space-inefficient provided the value fits
+/// 64-bit integer.
+/// By this transformation, we can reduce data length by around 30%.
 ///
-fn sc_geotag_pp(tag: String, geotag: String, to: String) {
+fn sc_geotag_pp(tag_pp: String, geotag: String, to: String) {
     // retrieve NO_TAG
     let no_tags: HashSet<u64> = {
-        let f = std::fs::File::open(tag).unwrap();
+        let f = std::fs::File::open(tag_pp).unwrap();
         let mut r = std::io::BufReader::new(f);
         let mut buf = String::new();
         r.read_line(&mut buf).unwrap();
@@ -112,7 +117,7 @@ fn sc_geotag_pp(tag: String, geotag: String, to: String) {
     eprintln!("tag read");
 
     let geotag_re = regex::Regex::new(&format!(
-        r"^(\d+),(.+),(.+),(.+),{}(\d){}(.+){}$",
+        r"^(\d{{8,10}}),(.+),(.+),(.+),{}(\d){}(\d{{1,4}})/\d{{8,10}}_([0-9a-f]{{10}}){}$",
         URL_PREFIX, URL_COMMON, URL_SUFFIX
     ))
     .unwrap();
@@ -128,27 +133,29 @@ fn sc_geotag_pp(tag: String, geotag: String, to: String) {
         }
         if let Some(i) = geotag_re.captures(&s) {
             let mut i = i.iter().skip(1);
-            let id: u64 = i.next().unwrap().unwrap().as_str().parse().unwrap();
+            let id = i.next().unwrap().unwrap().as_str().parse().unwrap();
             if no_tags.contains(&id) {
                 continue;
             }
 
             let time = {
                 let s = i.next().unwrap().unwrap().as_str();
-                chrono::NaiveDateTime::parse_from_str(s, "\"%Y-%m-%d %H:%M:%S\"").unwrap()
+                chrono::NaiveDateTime::parse_from_str(&s[1..s.len()-1], "%Y-%m-%d %H:%M:%S").unwrap().timestamp() as i32
             };
             let latitude: f64 = i.next().unwrap().unwrap().as_str().parse().unwrap();
             let longitude: f64 = i.next().unwrap().unwrap().as_str().parse().unwrap();
-            let serv_num = i.next().unwrap().unwrap().as_str().chars().next().unwrap();
-            let url_part = i.next().unwrap().unwrap().as_str().to_owned();
+            let domain_num = i.next().unwrap().unwrap().as_str().chars().next().unwrap();
+            let url_num1 = i.next().unwrap().unwrap().as_str().parse().unwrap();
+            let url_num2 = u64::from_str_radix(i.next().unwrap().unwrap().as_str(), 16).unwrap();
             geotags.insert(
                 id,
                 GeoTag {
                     time,
                     latitude,
                     longitude,
-                    serv_num,
-                    url_part,
+                    domain_num,
+                    url_num1,
+                    url_num2,
                 },
             );
         } else {
@@ -159,6 +166,7 @@ fn sc_geotag_pp(tag: String, geotag: String, to: String) {
 
     let f = std::fs::OpenOptions::new()
         .write(true)
+        .truncate(true)
         .create(true)
         .open(to)
         .unwrap();
@@ -167,8 +175,8 @@ fn sc_geotag_pp(tag: String, geotag: String, to: String) {
     for (k, v) in geotags {
         writeln!(
             w,
-            "{},{:?},{},{},{},{}",
-            k, v.time, v.latitude, v.longitude, v.serv_num, v.url_part
+            "{},{},{},{},{},{},{:010x}",
+            k, v.time, v.latitude, v.longitude, v.domain_num, v.url_num1, v.url_num2
         );
     }
 }
