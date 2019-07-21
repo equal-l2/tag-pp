@@ -24,6 +24,7 @@ fn sc_tag_pp(tag: String, to: String) {
         let r = std::io::BufReader::new(f);
 
         let tag_re = regex::Regex::new(r"^(\d+),(.*)$").unwrap();
+        let quote_re = regex::Regex::new("\"\"\"(.*)\"\"\"").unwrap();
 
         // read all entries and put them into HashMap
         for s in r.lines() {
@@ -37,7 +38,11 @@ fn sc_tag_pp(tag: String, to: String) {
                 if key.is_empty() {
                     no_tags.insert(id);
                 } else {
-                    tags.entry(key.to_owned()).or_insert_with(Vec::new).push(id);
+                    let key = match quote_re.captures(&key) {
+                        Some(i) => i.get(1).unwrap().as_str(),
+                        None => key
+                    }.to_owned();
+                    tags.entry(key).or_insert_with(Vec::new).push(id);
                 }
             } else {
                 eprintln!("Ignored : {}", s);
@@ -111,7 +116,13 @@ fn sc_geotag_pp(tag_pp: String, geotag: String, to: String) {
         if buf.ends_with('\n') {
             buf.pop();
         }
-        buf.split(',').skip(2).map(|s| s.parse().unwrap()).collect()
+        let mut it = buf.split(',').skip(1);
+        if it.next().unwrap().parse::<u64>().unwrap() == 0 {
+            println!("NO_TAG is empty");
+            HashSet::new()
+        } else {
+            it.map(|s| s.parse().unwrap()).collect()
+        }
     };
 
     eprintln!("tag read");
@@ -146,7 +157,7 @@ fn sc_geotag_pp(tag_pp: String, geotag: String, to: String) {
             };
             let latitude: f64 = i.next().unwrap().unwrap().as_str().parse().unwrap();
             let longitude: f64 = i.next().unwrap().unwrap().as_str().parse().unwrap();
-            let domain_num = i.next().unwrap().unwrap().as_str().chars().next().unwrap();
+            let domain_num = i.next().unwrap().unwrap().as_str().parse().unwrap();
             let url_num1 = i.next().unwrap().unwrap().as_str().parse().unwrap();
             let url_num2 = u64::from_str_radix(i.next().unwrap().unwrap().as_str(), 16).unwrap();
             geotags.insert(
