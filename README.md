@@ -1,6 +1,7 @@
 # tag-pp
+情報科学実験I超高性能化課題のためのデータ前処理プログラム  
+データ構造は [tag-geotag](https://github.com/equal-l2/tag-geotag) を参照   
 
-tag-pp:
     $ tag-pp <サブコマンド>
 
     サブコマンド一覧
