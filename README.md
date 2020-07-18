@@ -46,10 +46,10 @@ geotagをgeotag_pp.csv形式に変換
 
 - URL  
 URLは全部以下のような形。  
-`http://farm<ドメイン数>.static.flickr.com/<ディレクトリ数>/<画像ID>_<末尾数>.jpg`  
+`http://farm<domain_num>.static.flickr.com/<url_num1>/<ID>_<url_num2>.jpg`  
 ここで、それぞれの要素は以下のような性質を持つ  
-    - ドメイン数: 数字1文字
-    - ディレクトリ数: 数字1~4文字
-    - 末尾数: 10桁の16進数
+    - domain_num: 数字1文字
+    - url_num1: 数字1~4文字
+    - url_num2: 10桁の16進数
 
 共通部分を削って、あと画像IDはすでに出てきてるので削除すると、元の61文字(概算)から、データと区切り文字で合わせて17文字まで減らせる
