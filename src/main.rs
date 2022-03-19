@@ -139,8 +139,8 @@ fn sc_geotag_pp(tag_pp: String, geotag: String, to: String) -> Result<()> {
         }
         match parse_string_to_id_geotag(&s, &no_tags) {
             Ok(i) => geotags.push(i),
-            Err(e) => match e {
-                ParseError::NoTag(_) => { /* no-op */ }
+            Err(e) => match e.downcast_ref() {
+                Some(GeoTagParseError::NoTag(_)) => { /* no-op */ }
                 _ => eprintln!("Ignored : {}", s),
             },
         }
