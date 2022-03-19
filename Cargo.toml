@@ -11,3 +11,6 @@ regex = "*"
 tag-geotag = {path = "../tag-geotag"}
 chrono = "*"
 once_cell = "*"
+
+[features]
+unfair = []
