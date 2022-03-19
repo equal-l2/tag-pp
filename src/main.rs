@@ -3,6 +3,8 @@ use std::io::BufRead;
 use std::io::Write;
 use std::prelude::v1::*;
 
+use anyhow::Result;
+
 mod parse;
 use parse::*;
 
@@ -20,21 +22,19 @@ mod unfair;
 ///
 /// The resulting CSV has a "NO_TAG" entry at the first line, which contains ids without tag.
 ///
-fn sc_tag_pp(tag: String, to: String) {
-    let mut tags = BTreeMap::new();
-    let mut no_tags = Vec::new();
+fn sc_tag_pp(tag: String, to: String) -> Result<()> {
+    let (tags, no_tags) = {
+        let mut tags = BTreeMap::new();
+        let mut no_tags = Vec::new();
 
-    {
-        let f = std::fs::File::open(tag).unwrap();
+        let f = std::fs::File::open(tag)?;
         let r = std::io::BufReader::new(f);
 
         // read all entries and put them into Map
         for s in r.lines() {
-            let mut s = s.unwrap();
-            if s.ends_with('\n') {
-                s.pop();
-            }
-            if let Some(i) = parse_string_to_tag_id(&s) {
+            let s = s?;
+            let s = s.trim_end();
+            if let Some(i) = parse_string_to_tag_id(s) {
                 if i.0.is_empty() {
                     no_tags.push(i.1);
                 } else {
@@ -46,41 +46,46 @@ fn sc_tag_pp(tag: String, to: String) {
         }
         eprintln!("Entries: {}", tags.len());
         eprintln!("NO_TAG len: {}", no_tags.len());
-    }
 
-    let f = std::fs::OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open(to)
-        .unwrap();
-    let mut w = std::io::BufWriter::new(f);
+        (tags, no_tags)
+    };
 
-    // write NO_TAG first
-    writeln!(
-        w,
-        "NO_TAG,{},{}",
-        no_tags.len(),
-        no_tags
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>()
-            .join(",")
-    );
+    {
+        let f = std::fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(to)?;
+        let mut w = std::io::BufWriter::new(f);
 
-    // write the other normal entries
-    for (k, v) in tags {
+        // write NO_TAG first
         writeln!(
             w,
-            "{},{},{}",
-            k,
-            v.len(),
-            v.iter()
+            "NO_TAG,{},{}",
+            no_tags.len(),
+            no_tags
+                .iter()
                 .map(ToString::to_string)
                 .collect::<Vec<_>>()
                 .join(",")
-        );
+        )?;
+
+        // write the other normal entries
+        for (k, v) in tags {
+            writeln!(
+                w,
+                "{},{},{}",
+                k,
+                v.len(),
+                v.iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )?;
+        }
     }
+
+    Ok(())
 }
 
 /// Preprocess geotag.csv
@@ -102,18 +107,18 @@ fn sc_tag_pp(tag: String, to: String) {
 /// 64-bit integer.
 /// By this transformation, we can reduce data length by around 30%.
 ///
-fn sc_geotag_pp(tag_pp: String, geotag: String, to: String) {
+fn sc_geotag_pp(tag_pp: String, geotag: String, to: String) -> Result<()> {
     // retrieve NO_TAG
     let no_tags = {
-        let f = std::fs::File::open(tag_pp).unwrap();
+        let f = std::fs::File::open(tag_pp)?;
         let mut r = std::io::BufReader::new(f);
         let mut buf = String::new();
-        r.read_line(&mut buf).unwrap();
+        r.read_line(&mut buf)?;
         if buf.ends_with('\n') {
             buf.pop();
         }
         let mut it = buf.split(',').skip(1);
-        if it.next().unwrap().parse::<u64>().unwrap() == 0 {
+        if (it.next().unwrap().parse::<u64>())? == 0 {
             println!("NO_TAG is empty");
             Default::default()
         } else {
@@ -123,12 +128,12 @@ fn sc_geotag_pp(tag_pp: String, geotag: String, to: String) {
 
     eprintln!("tag read");
 
-    let f = std::fs::File::open(geotag).unwrap();
+    let f = std::fs::File::open(geotag)?;
     let r = std::io::BufReader::new(f);
 
     let mut geotags = Vec::new();
     for s in r.lines() {
-        let mut s = s.unwrap();
+        let mut s = s?;
         if s.ends_with('\n') {
             s.pop();
         }
@@ -146,8 +151,7 @@ fn sc_geotag_pp(tag_pp: String, geotag: String, to: String) {
         .write(true)
         .truncate(true)
         .create(true)
-        .open(to)
-        .unwrap();
+        .open(to)?;
     let mut w = std::io::BufWriter::new(f);
 
     for v in geotags {
@@ -155,13 +159,16 @@ fn sc_geotag_pp(tag_pp: String, geotag: String, to: String) {
             w,
             "{},{},{},{},{},{},{:010x}",
             v.0, v.1.time, v.1.latitude, v.1.longitude, v.1.domain_num, v.1.url_num1, v.1.url_num2
-        );
+        )?;
     }
+
+    Ok(())
 }
 
-fn sc_gen_test(tag: String, geotag: String, to_dir: String, num: usize) {
+// get top n items from geotags, and generate coherent tag_pp and geotag_pp
+fn sc_gen_test(tag: String, geotag: String, to_dir: String, num: usize) -> Result<()> {
     // read geotags
-    let f = std::fs::File::open(geotag).unwrap();
+    let f = std::fs::File::open(geotag)?;
     let r = std::io::BufReader::new(f);
     let v = Default::default();
 
@@ -175,13 +182,13 @@ fn sc_gen_test(tag: String, geotag: String, to_dir: String, num: usize) {
     eprintln!("GeoTag entries: {}", geotags.len());
 
     // read tags
-    let f = std::fs::File::open(tag).unwrap();
+    let f = std::fs::File::open(tag)?;
     let r = std::io::BufReader::new(f);
     let mut tags = BTreeMap::new();
     let mut no_tags = Vec::new();
 
     for s in r.lines() {
-        let mut s = s.unwrap();
+        let mut s = s?;
         if s.ends_with('\n') {
             s.pop();
         }
@@ -205,8 +212,7 @@ fn sc_gen_test(tag: String, geotag: String, to_dir: String, num: usize) {
         .write(true)
         .truncate(true)
         .create(true)
-        .open(format!("{}/tag_pp.csv", to_dir))
-        .unwrap();
+        .open(format!("{}/tag_pp.csv", to_dir))?;
     let mut w = std::io::BufWriter::new(f);
 
     // write NO_TAG first
@@ -219,7 +225,7 @@ fn sc_gen_test(tag: String, geotag: String, to_dir: String, num: usize) {
             .map(ToString::to_string)
             .collect::<Vec<_>>()
             .join(",")
-    );
+    )?;
 
     // write the other normal entries
     for (k, v) in tags {
@@ -232,15 +238,14 @@ fn sc_gen_test(tag: String, geotag: String, to_dir: String, num: usize) {
                 .map(ToString::to_string)
                 .collect::<Vec<_>>()
                 .join(",")
-        );
+        )?;
     }
 
     let f = std::fs::OpenOptions::new()
         .write(true)
         .truncate(true)
         .create(true)
-        .open(format!("{}/geotag_pp.csv", to_dir))
-        .unwrap();
+        .open(format!("{}/geotag_pp.csv", to_dir))?;
     let mut w = std::io::BufWriter::new(f);
 
     for v in geotags {
@@ -248,8 +253,10 @@ fn sc_gen_test(tag: String, geotag: String, to_dir: String, num: usize) {
             w,
             "{},{},{},{},{},{},{:010x}",
             v.0, v.1.time, v.1.latitude, v.1.longitude, v.1.domain_num, v.1.url_num1, v.1.url_num2
-        );
+        )?;
     }
+
+    Ok(())
 }
 
 fn main() {
@@ -260,13 +267,13 @@ fn main() {
         "tag-pp" => {
             let tag = args.next().expect("tag-pp: tag missing");
             let to = args.next().expect("tag-pp: To missing");
-            sc_tag_pp(tag, to);
+            sc_tag_pp(tag, to).unwrap();
         }
         "geotag-pp" => {
             let tag_pp = args.next().expect("geotag-pp: Tag_pp missing");
             let geotag = args.next().expect("geotag-pp: Geotag missing");
             let to = args.next().expect("geotag-pp: To missing");
-            sc_geotag_pp(tag_pp, geotag, to);
+            sc_geotag_pp(tag_pp, geotag, to).unwrap();
         }
         "gen-test" => {
             let tag = args.next().expect("gen-test: Tag missing");
@@ -277,7 +284,7 @@ fn main() {
                 .expect("gen-test: Num missing")
                 .parse()
                 .expect("gen-test: Num is not numeric");
-            sc_gen_test(tag, geotag, to_dir, num);
+            sc_gen_test(tag, geotag, to_dir, num).unwrap();
         }
         #[cfg(feature = "unfair")]
         "ultimate" => {

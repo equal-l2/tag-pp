@@ -98,4 +98,3 @@ pub fn ultimate() {
     }
     println!("Geotag wrote");
 }
-

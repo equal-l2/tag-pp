@@ -19,7 +19,7 @@ pub enum ParseError {
     NoMatch,
 }
 
-pub fn parse_string_to_tag_id(s: &String) -> Option<(String, u64)> {
+pub fn parse_string_to_tag_id(s: &str) -> Option<(String, u64)> {
     if let Some(i) = TAG_RE.captures(&s) {
         let id = i.get(1).unwrap().as_str().parse::<u64>().unwrap();
         let key = i.get(2).unwrap().as_str();
