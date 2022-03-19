@@ -312,9 +312,9 @@ fn ultimate() {
                 "{},{}",
                 k,
                 v.iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .join(",")
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(",")
             );
         }
     }

@@ -1,7 +1,7 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use tag_geotag::*;
 use std::collections::HashSet;
+use tag_geotag::*;
 
 static TAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(\d+),(.*)$").unwrap());
 static QUOTE_RE: Lazy<Regex> = Lazy::new(|| Regex::new("\"\"\"(.*)\"\"\"").unwrap());
@@ -12,7 +12,6 @@ static GEOTAG_RE: Lazy<Regex> = Lazy::new(|| {
     ))
     .unwrap()
 });
-
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -34,7 +33,10 @@ pub fn parse_string_to_tag_id(s: &String) -> Option<(String, u64)> {
     }
 }
 
-pub fn parse_string_to_id_geotag(s: &String, no_tags: &HashSet<u64>) -> Result<(u64, GeoTag), ParseError> {
+pub fn parse_string_to_id_geotag(
+    s: &String,
+    no_tags: &HashSet<u64>,
+) -> Result<(u64, GeoTag), ParseError> {
     if let Some(i) = GEOTAG_RE.captures(&s) {
         let mut i = i.iter().skip(1);
         let id = i.next().unwrap().unwrap().as_str().parse().unwrap();
