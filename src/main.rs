@@ -282,17 +282,64 @@ fn sc_gen_test(tag: String, geotag: String, to_dir: String, num: usize) -> Resul
     Ok(())
 }
 
+fn hikaku<T: AsRef<Path>>(tag_pp: T, geotag_pp: T) -> Result<()> {
+    let tags_ids = {
+        let f = std::fs::File::open(tag_pp)?;
+        let r = std::io::BufReader::new(f);
+
+        let mut ids = HashSet::new();
+
+        for l in r.lines().skip(1) {
+            let l = l?;
+            let it = l.split(',').skip(2);
+            ids.extend(it.map(|s| s.parse::<u64>().unwrap()));
+        }
+        ids
+    };
+
+    let geotags_ids = {
+        let f = std::fs::File::open(geotag_pp)?;
+        let r = std::io::BufReader::new(f);
+
+        let mut ids = HashSet::new();
+
+        for l in r.lines() {
+            let l = l?;
+            let id: u64 = l.split(',').next().unwrap().parse().unwrap();
+            ids.insert(id);
+        }
+        ids
+    };
+
+    if tags_ids != geotags_ids {
+        let diff = tags_ids.difference(&geotags_ids).collect::<Vec<_>>();
+        if diff.len() < 100 {
+            println!("{} {:?}", diff.len(), diff);
+        } else {
+            println!("{} {:?}", diff.len(), &diff[0..100]);
+        }
+    }
+
+    Ok(())
+}
+
 #[derive(clap::StructOpt)]
 enum Opt {
     #[clap(name = "tag-pp", about = "Preprocess tags")]
-    TagPp { tag: PathBuf, to: PathBuf },
+    TagPp {
+        tag: PathBuf,
+        to: PathBuf,
+    },
     #[clap(name = "geotag-pp", about = "Preprocess geotags")]
     GeoTagPp {
         tag_pp: PathBuf,
         geotag: PathBuf,
         to: PathBuf,
     },
-    #[clap(name = "gen-test", about = "Extract small tag_pp and geotag_pp for testing")]
+    #[clap(
+        name = "gen-test",
+        about = "Extract small tag_pp and geotag_pp for testing"
+    )]
     GenTest {
         tag: String,
         geotag: String,
@@ -302,6 +349,10 @@ enum Opt {
     #[cfg(feature = "ultimate")]
     #[clap(name = "geotag-pp")]
     Ultimate,
+    Hikaku {
+        tag_pp: PathBuf,
+        geotag_pp: PathBuf,
+    },
 }
 
 fn main() {
@@ -318,5 +369,6 @@ fn main() {
         } => sc_gen_test(tag, geotag, to_dir, num).unwrap(),
         #[cfg(feature = "unfair")]
         Opt::Ultimate => unfair::ultimate(),
+        Opt::Hikaku { tag_pp, geotag_pp } => hikaku(tag_pp, geotag_pp).unwrap(),
     }
 }
