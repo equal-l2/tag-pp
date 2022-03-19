@@ -32,10 +32,10 @@ impl std::fmt::Display for GeoTagParseError {
 impl std::error::Error for GeoTagParseError {}
 
 pub fn parse_string_to_tag_id(s: &str) -> Option<(String, u64)> {
-    if let Some(i) = TAG_RE.captures(&s) {
+    if let Some(i) = TAG_RE.captures(s) {
         let id = i.get(1).unwrap().as_str().parse::<u64>().unwrap();
         let key = i.get(2).unwrap().as_str();
-        let key = match QUOTE_RE.captures(&key) {
+        let key = match QUOTE_RE.captures(key) {
             Some(i) => i.get(1).unwrap().as_str(),
             None => key,
         };
@@ -45,8 +45,8 @@ pub fn parse_string_to_tag_id(s: &str) -> Option<(String, u64)> {
     }
 }
 
-pub fn parse_string_to_id_geotag(s: &String, no_tags: &HashSet<u64>) -> Result<(u64, GeoTag)> {
-    if let Some(i) = GEOTAG_RE.captures(&s) {
+pub fn parse_string_to_id_geotag(s: &str, no_tags: &HashSet<u64>) -> Result<(u64, GeoTag)> {
+    if let Some(i) = GEOTAG_RE.captures(s) {
         let mut i = i.iter().skip(1);
         let id = i.next().unwrap().unwrap().as_str().parse()?;
         if no_tags.contains(&id) {
