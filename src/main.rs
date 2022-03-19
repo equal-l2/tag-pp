@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::io::BufRead;
 use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::prelude::v1::*;
 
 use anyhow::Result;
@@ -22,7 +23,7 @@ mod unfair;
 ///
 /// The resulting CSV has a "NO_TAG" entry at the first line, which contains ids without tag.
 ///
-fn sc_tag_pp(tag: String, to: String) -> Result<()> {
+fn sc_tag_pp<T: AsRef<Path>>(tag: T, to: T) -> Result<()> {
     let (tags, no_tags) = {
         let mut tags = BTreeMap::new();
         let mut no_tags = Vec::new();
@@ -107,7 +108,7 @@ fn sc_tag_pp(tag: String, to: String) -> Result<()> {
 /// 64-bit integer.
 /// By this transformation, we can reduce data length by around 30%.
 ///
-fn sc_geotag_pp(tag_pp: String, geotag: String, to: String) -> Result<()> {
+fn sc_geotag_pp<T: AsRef<Path>>(tag_pp: T, geotag: T, to: T) -> Result<()> {
     // retrieve NO_TAG
     let no_tags = {
         // read the first line (NO_TAG)
@@ -281,37 +282,41 @@ fn sc_gen_test(tag: String, geotag: String, to_dir: String, num: usize) -> Resul
     Ok(())
 }
 
-fn main() {
-    let mut args = std::env::args().skip(1);
-    let sc = args.next().expect("Subcommand missing");
+#[derive(clap::StructOpt)]
+enum Opt {
+    #[clap(name = "tag-pp", about = "Preprocess tags")]
+    TagPp { tag: PathBuf, to: PathBuf },
+    #[clap(name = "geotag-pp", about = "Preprocess geotags")]
+    GeoTagPp {
+        tag_pp: PathBuf,
+        geotag: PathBuf,
+        to: PathBuf,
+    },
+    #[clap(name = "gen-test", about = "Extract small tag_pp and geotag_pp for testing")]
+    GenTest {
+        tag: String,
+        geotag: String,
+        to_dir: String,
+        num: usize,
+    },
+    #[cfg(feature = "ultimate")]
+    #[clap(name = "geotag-pp")]
+    Ultimate,
+}
 
-    match sc.as_str() {
-        "tag-pp" => {
-            let tag = args.next().expect("tag-pp: tag missing");
-            let to = args.next().expect("tag-pp: To missing");
-            sc_tag_pp(tag, to).unwrap();
-        }
-        "geotag-pp" => {
-            let tag_pp = args.next().expect("geotag-pp: Tag_pp missing");
-            let geotag = args.next().expect("geotag-pp: Geotag missing");
-            let to = args.next().expect("geotag-pp: To missing");
-            sc_geotag_pp(tag_pp, geotag, to).unwrap();
-        }
-        "gen-test" => {
-            let tag = args.next().expect("gen-test: Tag missing");
-            let geotag = args.next().expect("gen-test: Geotag missing");
-            let to_dir = args.next().expect("gen-test: To_dir missing");
-            let num = args
-                .next()
-                .expect("gen-test: Num missing")
-                .parse()
-                .expect("gen-test: Num is not numeric");
-            sc_gen_test(tag, geotag, to_dir, num).unwrap();
-        }
+fn main() {
+    let opt: Opt = clap::Parser::parse();
+
+    match opt {
+        Opt::TagPp { tag, to } => sc_tag_pp(tag, to).unwrap(),
+        Opt::GeoTagPp { tag_pp, geotag, to } => sc_geotag_pp(tag_pp, geotag, to).unwrap(),
+        Opt::GenTest {
+            tag,
+            geotag,
+            to_dir,
+            num,
+        } => sc_gen_test(tag, geotag, to_dir, num).unwrap(),
         #[cfg(feature = "unfair")]
-        "ultimate" => {
-            unfair::ultimate();
-        }
-        _ => panic!("Unknown subcommand"),
+        Opt::Ultimate => unfair::ultimate(),
     }
 }

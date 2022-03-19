@@ -4,16 +4,6 @@ use regex::Regex;
 use std::collections::HashSet;
 use tag_geotag::*;
 
-static TAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(\d+),(.*)$").unwrap());
-static QUOTE_RE: Lazy<Regex> = Lazy::new(|| Regex::new("\"\"\"(.*)\"\"\"").unwrap());
-static GEOTAG_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(&format!(
-        r"^(\d{{8,10}}),(.+),(.+),(.+),{}(\d){}(\d{{1,4}})/\d{{8,10}}_([0-9a-f]{{10}}){}$",
-        URL_PREFIX, URL_COMMON, URL_SUFFIX
-    ))
-    .unwrap()
-});
-
 #[derive(Debug)]
 pub enum GeoTagParseError {
     NoTag(u64),
@@ -32,6 +22,9 @@ impl std::fmt::Display for GeoTagParseError {
 impl std::error::Error for GeoTagParseError {}
 
 pub fn parse_string_to_tag_id(s: &str) -> Option<(String, u64)> {
+    static TAG_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(\d+),(.*)$").unwrap());
+    static QUOTE_RE: Lazy<Regex> = Lazy::new(|| Regex::new("\"\"\"(.*)\"\"\"").unwrap());
+
     if let Some(i) = TAG_RE.captures(s) {
         let id = i.get(1).unwrap().as_str().parse::<u64>().unwrap();
         let key = i.get(2).unwrap().as_str();
@@ -46,6 +39,14 @@ pub fn parse_string_to_tag_id(s: &str) -> Option<(String, u64)> {
 }
 
 pub fn parse_string_to_id_geotag(s: &str, no_tags: &HashSet<u64>) -> Result<(u64, GeoTag)> {
+    static GEOTAG_RE: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(&format!(
+            r"^(\d{{8,10}}),(.+),(.+),(.+),{}(\d){}(\d{{1,4}})/\d{{8,10}}_([0-9a-f]{{10}}){}$",
+            URL_PREFIX, URL_COMMON, URL_SUFFIX
+        ))
+        .unwrap()
+    });
+
     if let Some(i) = GEOTAG_RE.captures(s) {
         let mut i = i.iter().skip(1);
         let id = i.next().unwrap().unwrap().as_str().parse()?;
