@@ -55,8 +55,13 @@ pub fn parse_string_to_id_geotag(s: &str, no_tags: &HashSet<u64>) -> Result<(u64
         }
         let time = {
             let s = i.next().unwrap().unwrap().as_str();
-            chrono::NaiveDateTime::parse_from_str(&s[1..s.len() - 1], "%Y-%m-%d %H:%M:%S")?
-                .timestamp() as i32
+            static FORMAT: Lazy<Vec<time::format_description::FormatItem<'_>>> = Lazy::new(|| {
+                time::format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]")
+                    .expect("bad time format")
+            });
+            time::PrimitiveDateTime::parse(&s[1..s.len() - 1], &FORMAT)?
+                .assume_utc()
+                .unix_timestamp() as i32
         };
         let latitude: f64 = i.next().unwrap().unwrap().as_str().parse().unwrap();
         let longitude: f64 = i.next().unwrap().unwrap().as_str().parse().unwrap();
